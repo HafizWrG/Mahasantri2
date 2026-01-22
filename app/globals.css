@@ -9,6 +9,15 @@
   }
 }
 
+export const metadata: Metadata = {
+  title: "MAHASANTRI SITE",
+  description: "Sistem Akademik Mahasantri",
+  icons: {
+    icon: 'https://hafizwrg.github.io/mahasantri/lo.png', // <--- Icon baru kamu
+    apple: 'https://hafizwrg.github.io/mahasantri/lo.png', // Opsional: untuk iPhone/iPad
+  },
+};
+
 /* Kustomisasi Scrollbar (Opsional) */
 ::-webkit-scrollbar {
   width: 8px;
