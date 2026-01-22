@@ -6,8 +6,12 @@ import {
   Search, Menu, X, CheckCircle, AlertCircle, Loader2, 
   LayoutDashboard, Plus, Trash2, User, LogOut, 
   ExternalLink, Download, Lock, KeyRound, ShieldCheck,
-  GraduationCap, CreditCard, FileText, Eye, EyeOff, Edit3, Save
+  GraduationCap, CreditCard, FileText, Eye, EyeOff, Edit3, Save, BookOpen
 } from 'lucide-react';
+
+// ... (UI COMPONENTS: Toast, Skeleton, Button, Input, Card, Badge tetap sama seperti sebelumnya) ...
+// Untuk menghemat karakter, saya asumsikan komponen UI di atas tidak berubah.
+// Langsung masuk ke MAIN LOGIC.
 
 // ==========================================
 // 1. UI COMPONENTS (LIGHTWEIGHT VERSION)
@@ -30,11 +34,6 @@ const Toast = ({ message, type, onClose }: { message: string, type: 'success' | 
   );
 };
 
-// Removed animate-pulse for performance
-const Skeleton = ({ className = "" }: { className?: string }) => (
-  <div className={`bg-slate-200 rounded ${className}`} />
-);
-
 const Button = ({ children, variant = "primary", size = "default", className = "", isLoading, ...props }: any) => {
   const base = "inline-flex items-center justify-center rounded-lg font-medium active:scale-95 disabled:opacity-50 disabled:pointer-events-none";
   const variants: any = {
@@ -42,7 +41,7 @@ const Button = ({ children, variant = "primary", size = "default", className = "
     secondary: "bg-white text-slate-700 border border-slate-300 hover:bg-slate-50",
     ghost: "bg-transparent text-slate-600 hover:bg-slate-100 hover:text-slate-900",
     danger: "bg-white text-rose-600 border border-rose-200 hover:bg-rose-50",
-    glass: "bg-white/80 text-slate-800 border border-white/50 hover:bg-white" // Removed heavy glass effect
+    glass: "bg-white/80 text-slate-800 border border-white/50 hover:bg-white" 
   };
   const sizes: any = {
     sm: "h-8 px-3 text-xs",
@@ -68,7 +67,6 @@ const Input = ({ className = "", label, ...props }: any) => (
   </div>
 );
 
-// Removed blur and reduced shadow for performance
 const Card = ({ children, className = "", ...props }: any) => (
   <div className={`rounded-xl border border-slate-200 bg-white shadow-sm ${className}`} {...props}>
     {children}
@@ -89,6 +87,7 @@ const Badge = ({ children, variant = "default", className = "" }: any) => {
     </span>
   );
 };
+const Skeleton = ({ className = "" }: { className?: string }) => (<div className={`bg-slate-200 rounded ${className}`} />);
 
 // ==========================================
 // 2. MAIN LOGIC
@@ -102,7 +101,7 @@ export default function Home() {
   // Auth States
   const [loginMode, setLoginMode] = useState<'admin' | 'student'>('admin');
   const [loginForm, setLoginForm] = useState({ email: "", password: "", nim: "" });
-  const [user, setUser] = useState<any>(null); // { role: 'Admin' | 'Student', id?: number, name?: string }
+  const [user, setUser] = useState<any>(null); 
   
   const [loading, setLoading] = useState(false);
   const [isDataLoading, setIsDataLoading] = useState(true);
@@ -124,9 +123,12 @@ export default function Home() {
   const [galleryForm, setGalleryForm] = useState({ title: "", desc: "", type: "", link: "", icon: "" });
   const [showPassword, setShowPassword] = useState(false);
 
-  // Student Self-Edit State
+  // Student Self-Edit State (Profile)
   const [isStudentEditing, setIsStudentEditing] = useState(false);
   const [studentEditForm, setStudentEditForm] = useState<any>({});
+
+  // NEW: Student Grade Edit State
+  const [isStudentGradeEditing, setIsStudentGradeEditing] = useState(false);
 
   // --- UTILS ---
   const showToast = (message: string, type: 'success' | 'error') => {
@@ -146,7 +148,6 @@ export default function Home() {
 
   const fetchAcademicData = async () => {
     setIsDataLoading(true);
-    // Optimized Query: Only fetch necessary fields first
     const { data } = await supabase
       .from('students')
       .select(`
@@ -159,7 +160,6 @@ export default function Home() {
       .order('id', { ascending: true });
     
     if (data) {
-      // Sort in JS to reduce DB load complexity on free tier
       const sortedData = data.map((student: any) => ({
         ...student,
         semesters: student.semesters?.sort((a: any, b: any) => a.id - b.id).map((sem: any) => ({
@@ -265,7 +265,7 @@ export default function Home() {
   // --- ACTIONS ---
   const handleSiteUnlock = (e: React.FormEvent) => {
     e.preventDefault();
-    if (sitePin === "210250") {
+    if (sitePin === "203493") {
       setIsSiteUnlocked(true);
       setSitePin("");
     } else {
@@ -320,9 +320,11 @@ export default function Home() {
     if (user?.role === 'Admin') await supabase.auth.signOut();
     setUser(null);
     setCurrentPage('store');
+    setIsStudentEditing(false);
+    setIsStudentGradeEditing(false); // Reset grade edit mode
   }
 
-  // --- MAHASANTRI SELF EDIT ---
+  // --- MAHASANTRI SELF EDIT PROFILE ---
   const startStudentEdit = () => {
     const student = students[publicStudentId];
     setStudentEditForm({
@@ -348,7 +350,6 @@ export default function Home() {
         .eq('id', user.id);
 
     if (!error) {
-        // Update local state without refetching all
         const updatedStudents = students.map(s => s.id === user.id ? { ...s, ...studentEditForm } : s);
         setStudents(updatedStudents);
         setIsStudentEditing(false);
@@ -359,14 +360,51 @@ export default function Home() {
     setLoading(false);
   }
 
-  // --- DATA MUTATIONS (ADMIN) ---
+  // --- DATA MUTATIONS (SHARED: Admin & Student Grade Edit) ---
+  
+  const addSemester = async (studentId: number) => {
+    const student = students.find(s => s.id === studentId);
+    await supabase.from('semesters').insert([{ student_id: studentId, name: `Semester ${(student?.semesters?.length || 0) + 1}` }]);
+    fetchAcademicData();
+  };
+  
+  const deleteSemester = async (semId: number) => {
+    if(!confirm("Hapus semester?")) return;
+    await supabase.from('semesters').delete().eq('id', semId);
+    fetchAcademicData();
+    if(user?.role !== 'Student') setSelectedSemester(0);
+  };
+
+  const addSubject = async (semesterId: number) => {
+    await supabase.from('subjects').insert([{ semester_id: semesterId, name: "Matkul Baru", sks: 3 }]);
+    fetchAcademicData();
+  };
+
+  // Fungsi ini dipakai oleh Dashboard Admin DAN Halaman Report Mahasantri (Saat mode edit)
+  const handleSubjectChange = (studentIdx: number, semIdx: number, subIdx: number, field: string, value: string) => {
+    if (!students[studentIdx]?.semesters?.[semIdx]?.subjects?.[subIdx]) return;
+    const newStudents = [...students];
+    newStudents[studentIdx].semesters[semIdx].subjects[subIdx][field] = value;
+    setStudents(newStudents);
+  };
+
+  const saveSubjectBlur = async (subjectId: number, field: string, value: any) => {
+    await supabase.from('subjects').update({ [field]: value }).eq('id', subjectId);
+  };
+
+  const deleteSubject = async (subjectId: number) => {
+    if(!confirm("Hapus mata kuliah ini?")) return;
+    await supabase.from('subjects').delete().eq('id', subjectId);
+    fetchAcademicData();
+  };
+
+  // --- ADMIN ONLY ACTIONS ---
   const updateStudentInfo = async (id: number, field: string, value: string) => {
     const updatedStudents = students.map(s => s.id === id ? { ...s, [field]: value } : s);
     setStudents(updatedStudents);
     await supabase.from('students').update({ [field]: value }).eq('id', id);
   };
 
-  // ... (Other admin CRUD functions kept similar but optimized calls)
   const saveGalleryItem = async () => {
     if (!galleryForm.title) return showToast("Judul wajib!", "error");
     setLoading(true);
@@ -397,43 +435,10 @@ export default function Home() {
     setEditingStudentId(null);
   };
 
-  const addSemester = async (studentId: number) => {
-    const student = students.find(s => s.id === studentId);
-    await supabase.from('semesters').insert([{ student_id: studentId, name: `Semester ${(student?.semesters?.length || 0) + 1}` }]);
-    fetchAcademicData();
-  };
-  
-  const deleteSemester = async (semId: number) => {
-    if(!confirm("Hapus semester?")) return;
-    await supabase.from('semesters').delete().eq('id', semId);
-    fetchAcademicData();
-    setSelectedSemester(0);
-  };
-
-  const addSubject = async (semesterId: number) => {
-    await supabase.from('subjects').insert([{ semester_id: semesterId, name: "Matkul Baru", sks: 3 }]);
-    fetchAcademicData();
-  };
-
-  const handleSubjectChange = (studentIdx: number, semIdx: number, subIdx: number, field: string, value: string) => {
-    if (!students[studentIdx]?.semesters?.[semIdx]?.subjects?.[subIdx]) return;
-    const newStudents = [...students];
-    newStudents[studentIdx].semesters[semIdx].subjects[subIdx][field] = value;
-    setStudents(newStudents);
-  };
-
-  const saveSubjectBlur = async (subjectId: number, field: string, value: any) => {
-    await supabase.from('subjects').update({ [field]: value }).eq('id', subjectId);
-  };
-
-  const deleteSubject = async (subjectId: number) => {
-    await supabase.from('subjects').delete().eq('id', subjectId);
-    fetchAcademicData();
-  };
-
   // --- RENDERS ---
 
   if (!isSiteUnlocked) {
+    // ... (Login PIN render sama seperti sebelumnya)
     return (
       <div className="min-h-screen bg-slate-50 flex items-center justify-center p-4">
         <Card className="w-full max-w-sm p-6 text-center shadow-lg">
@@ -445,13 +450,14 @@ export default function Home() {
             <Input type="password" placeholder="PIN..." className="text-center text-xl tracking-widest font-bold" maxLength={6} value={sitePin} onChange={(e: any) => setSitePin(e.target.value)} />
             <Button type="submit" className="w-full font-bold">Buka Situs</Button>
           </form>
-          <p className="mt-4 text-xs text-indigo-600 font-medium">Hint: 210250</p>
+          <p className="mt-4 text-xs text-indigo-600 font-medium">Agar tidak sembarangan orang bisa masuk</p>
         </Card>
       </div>
     );
   }
 
   const renderStore = () => (
+    // ... (Render Store sama seperti sebelumnya)
     <div className="container mx-auto px-4 py-10">
       <div className="text-center mb-10 space-y-4">
         <Badge variant="indigo">DIGITAL GALLERY</Badge>
@@ -559,9 +565,10 @@ export default function Home() {
              ))}
           </div>
 
-          {/* EDIT FORM MODAL (INLINE) FOR STUDENT */}
+          {/* EDIT FORM MODAL (INLINE) FOR STUDENT PROFILE */}
           {isStudentEditing && isStudentLogin && (
             <div className="p-6 bg-indigo-50 border-b border-indigo-100">
+                {/* ... (Form edit profil sama seperti sebelumnya) ... */}
                 <h3 className="font-bold text-indigo-900 mb-4 flex items-center gap-2"><Edit3 className="w-4 h-4"/> Edit Data Diri</h3>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
                     <Input label="Nama Lengkap" value={studentEditForm.name} onChange={(e:any)=>setStudentEditForm({...studentEditForm, name: e.target.value})} />
@@ -569,14 +576,9 @@ export default function Home() {
                     <Input label="Prodi" value={studentEditForm.prodi} onChange={(e:any)=>setStudentEditForm({...studentEditForm, prodi: e.target.value})} />
                     <Input label="Bio Singkat" value={studentEditForm.bio || ""} onChange={(e:any)=>setStudentEditForm({...studentEditForm, bio: e.target.value})} />
                     <Input label="Password Login" value={studentEditForm.password || ""} onChange={(e:any)=>setStudentEditForm({...studentEditForm, password: e.target.value})} />
-                    <div className="md:col-span-2 space-y-2 mt-2">
-                        <p className="text-xs font-bold text-slate-500 uppercase">Link Dokumen (Google Drive/Cloud)</p>
-                        <Input placeholder="Link PDF DNU..." value={studentEditForm.dnu_url || ""} onChange={(e:any)=>setStudentEditForm({...studentEditForm, dnu_url: e.target.value})} />
-                        <div className="grid grid-cols-2 gap-2">
-                            <Input placeholder="Link Gambar KTM..." value={studentEditForm.ktm_url || ""} onChange={(e:any)=>setStudentEditForm({...studentEditForm, ktm_url: e.target.value})} />
-                            <Input placeholder="Link Gambar KTPU..." value={studentEditForm.ktpu_url || ""} onChange={(e:any)=>setStudentEditForm({...studentEditForm, ktpu_url: e.target.value})} />
-                        </div>
-                    </div>
+                    <Input label="Link PDF DNU" placeholder="Google Drive URL" value={studentEditForm.dnu_url || ""} onChange={(e:any)=>setStudentEditForm({...studentEditForm, dnu_url: e.target.value})} />
+                    <Input label="Link KTM" placeholder="Image URL" value={studentEditForm.ktm_url || ""} onChange={(e:any)=>setStudentEditForm({...studentEditForm, ktm_url: e.target.value})} />
+                    <Input label="Link KTPU" placeholder="Image URL" value={studentEditForm.ktpu_url || ""} onChange={(e:any)=>setStudentEditForm({...studentEditForm, ktpu_url: e.target.value})} />
                 </div>
                 <div className="flex gap-2 justify-end">
                     <Button variant="secondary" onClick={()=>setIsStudentEditing(false)}>Batal</Button>
@@ -585,47 +587,147 @@ export default function Home() {
             </div>
           )}
 
+          {/* GRADES TABLE HEADER WITH EDIT BUTTON */}
+          <div className="bg-slate-50 p-4 border-b border-slate-200 flex justify-between items-center sticky top-0">
+             <h3 className="font-bold text-slate-700 flex items-center gap-2"><BookOpen className="w-5 h-5"/> Laporan Akademik</h3>
+             {isStudentLogin && (
+                <Button 
+                    variant={isStudentGradeEditing ? "primary" : "secondary"} 
+                    size="sm" 
+                    onClick={() => setIsStudentGradeEditing(!isStudentGradeEditing)}
+                >
+                    {isStudentGradeEditing ? <><Save className="w-4 h-4 mr-2"/> Selesai Edit</> : <><Edit3 className="w-4 h-4 mr-2"/> Edit Nilai</>}
+                </Button>
+             )}
+          </div>
+
           {/* GRADES TABLE */}
           <div className="bg-slate-50 p-6 space-y-8">
-            {student.semesters?.map((sem: any) => (
+            {student.semesters?.map((sem: any, semIdx: number) => (
                 <div key={sem.id}>
                     <div className="flex justify-between items-center mb-3">
-                        <h3 className="font-bold text-slate-800 text-lg border-l-4 border-indigo-600 pl-3">{sem.name}</h3>
-                        <Badge variant="indigo">IPS: {calculateIPS(sem)}</Badge>
+                        <div className="flex items-center gap-3">
+                            <h3 className="font-bold text-slate-800 text-lg border-l-4 border-indigo-600 pl-3">{sem.name}</h3>
+                            {isStudentLogin && isStudentGradeEditing && (
+                                <button onClick={() => deleteSemester(sem.id)} className="text-xs text-rose-500 hover:underline"><Trash2 className="w-3 h-3"/></button>
+                            )}
+                        </div>
+                        <div className="flex items-center gap-2">
+                            {isStudentLogin && isStudentGradeEditing && (
+                                <Button size="sm" onClick={() => addSubject(sem.id)} className="h-7 text-xs">+ Matkul</Button>
+                            )}
+                            <Badge variant="indigo">IPS: {calculateIPS(sem)}</Badge>
+                        </div>
                     </div>
-                    <div className="overflow-x-auto rounded-lg border border-slate-200 bg-white">
+                    <div className="overflow-x-auto rounded-lg border border-slate-200 bg-white shadow-sm">
                         <table className="w-full text-xs text-left">
                         <thead className="bg-slate-100 text-slate-500 font-semibold border-b border-slate-200">
                             <tr>
-                            <th className="px-3 py-3 w-40">Mata Kuliah</th>
-                            <th className="px-1 py-3 text-center">SKS</th>
-                            {Array.from({length: 8}, (_, i) => <th key={`d${i}`} className="px-1 text-center w-8 text-[10px]">D{i+1}</th>)}
-                            {Array.from({length: 3}, (_, i) => <th key={`t${i}`} className="px-1 text-center w-8 text-[10px] text-indigo-600">T{i+1}</th>)}
-                            <th className="px-2 py-3 text-center w-12 text-amber-600">UAS</th>
-                            <th className="px-3 py-3 text-center w-14 font-bold">Nilai</th>
-                            <th className="px-3 py-3 text-center w-14 font-bold">Grade</th>
+                            <th className="px-3 py-3 min-w-[150px]">Mata Kuliah</th>
+                            <th className="px-1 py-3 text-center w-10">SKS</th>
+                            {Array.from({length: 8}, (_, i) => <th key={`d${i}`} className="px-1 text-center min-w-[30px] text-[10px]">D{i+1}</th>)}
+                            {Array.from({length: 3}, (_, i) => <th key={`t${i}`} className="px-1 text-center min-w-[30px] text-[10px] text-indigo-600">T{i+1}</th>)}
+                            <th className="px-2 py-3 text-center min-w-[40px] text-amber-600">UAS</th>
+                            <th className="px-3 py-3 text-center min-w-[50px] font-bold">Nilai</th>
+                            <th className="px-3 py-3 text-center min-w-[50px] font-bold">Grade</th>
+                            {isStudentLogin && isStudentGradeEditing && <th className="px-1 py-3 text-center w-8"></th>}
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-slate-100">
-                            {sem.subjects?.map((sub: any) => {
+                            {sem.subjects?.map((sub: any, subIdx: number) => {
                                 const stats = calculateStats(sub);
                                 return (
                                     <tr key={sub.id} className="hover:bg-slate-50">
-                                    <td className="px-3 py-2 font-medium text-slate-700">{sub.name}</td>
-                                    <td className="px-1 py-2 text-center text-slate-500">{sub.sks}</td>
-                                    {['d1','d2','d3','d4','d5','d6','d7','d8'].map(k => <td key={k} className="px-1 text-center text-slate-400">{sub[k]||'-'}</td>)}
-                                    {['t1','t2','t3'].map(k => <td key={k} className="px-1 text-center text-indigo-600 bg-indigo-50/20">{sub[k]||'-'}</td>)}
-                                    <td className="px-2 text-center font-bold text-amber-600 bg-amber-50/20">{sub.uas||'-'}</td>
-                                    <td className="px-3 text-center font-bold text-slate-700 bg-slate-100/50">{stats.finalScore}</td>
-                                    <td className="px-3 text-center"><Badge variant={stats.grade.includes('A')?'emerald':'default'}>{stats.grade}</Badge></td>
+                                        {/* NAME FIELD */}
+                                        <td className="px-3 py-2 font-medium text-slate-700">
+                                            {isStudentGradeEditing ? (
+                                                <input 
+                                                    className="w-full bg-slate-50 border-b border-slate-300 focus:border-indigo-500 focus:outline-none px-1" 
+                                                    value={sub.name} 
+                                                    onChange={(e) => handleSubjectChange(publicStudentId, semIdx, subIdx, 'name', e.target.value)} 
+                                                    onBlur={(e) => saveSubjectBlur(sub.id, 'name', e.target.value)} 
+                                                />
+                                            ) : sub.name}
+                                        </td>
+                                        
+                                        {/* SKS FIELD */}
+                                        <td className="px-1 py-2 text-center text-slate-500">
+                                            {isStudentGradeEditing ? (
+                                                <input 
+                                                    className="w-full text-center bg-slate-50 border border-slate-200 rounded" 
+                                                    value={sub.sks} 
+                                                    onChange={(e) => handleSubjectChange(publicStudentId, semIdx, subIdx, 'sks', e.target.value)} 
+                                                    onBlur={(e) => saveSubjectBlur(sub.id, 'sks', e.target.value)} 
+                                                />
+                                            ) : sub.sks}
+                                        </td>
+
+                                        {/* D1-D8 FIELDS */}
+                                        {['d1','d2','d3','d4','d5','d6','d7','d8'].map(k => (
+                                            <td key={k} className="px-1 text-center text-slate-400">
+                                                {isStudentGradeEditing ? (
+                                                    <input 
+                                                        className="w-full text-center text-[10px] bg-white border border-slate-100 focus:border-indigo-300 rounded"
+                                                        value={sub[k]||""} 
+                                                        onChange={(e) => handleSubjectChange(publicStudentId, semIdx, subIdx, k, e.target.value)} 
+                                                        onBlur={(e) => saveSubjectBlur(sub.id, k, e.target.value)} 
+                                                    />
+                                                ) : sub[k]||'-'}
+                                            </td>
+                                        ))}
+
+                                        {/* T1-T3 FIELDS */}
+                                        {['t1','t2','t3'].map(k => (
+                                            <td key={k} className="px-1 text-center text-indigo-600 bg-indigo-50/20">
+                                                {isStudentGradeEditing ? (
+                                                    <input 
+                                                        className="w-full text-center text-[10px] bg-indigo-50/50 border border-indigo-100 focus:border-indigo-400 rounded text-indigo-700"
+                                                        value={sub[k]||""} 
+                                                        onChange={(e) => handleSubjectChange(publicStudentId, semIdx, subIdx, k, e.target.value)} 
+                                                        onBlur={(e) => saveSubjectBlur(sub.id, k, e.target.value)} 
+                                                    />
+                                                ) : sub[k]||'-'}
+                                            </td>
+                                        ))}
+
+                                        {/* UAS FIELD */}
+                                        <td className="px-2 text-center font-bold text-amber-600 bg-amber-50/20">
+                                            {isStudentGradeEditing ? (
+                                                <input 
+                                                    className="w-full text-center font-bold bg-amber-50 border border-amber-200 focus:border-amber-400 rounded text-amber-700"
+                                                    value={sub.uas||""} 
+                                                    onChange={(e) => handleSubjectChange(publicStudentId, semIdx, subIdx, 'uas', e.target.value)} 
+                                                    onBlur={(e) => saveSubjectBlur(sub.id, 'uas', e.target.value)} 
+                                                />
+                                            ) : sub.uas||'-'}
+                                        </td>
+
+                                        {/* READ ONLY CALCULATED FIELDS */}
+                                        <td className="px-3 text-center font-bold text-slate-700 bg-slate-100/50">{stats.finalScore}</td>
+                                        <td className="px-3 text-center"><Badge variant={stats.grade.includes('A')?'emerald':'default'}>{stats.grade}</Badge></td>
+                                        
+                                        {/* DELETE BUTTON */}
+                                        {isStudentLogin && isStudentGradeEditing && (
+                                            <td className="px-1 text-center">
+                                                <button onClick={() => deleteSubject(sub.id)} className="text-rose-400 hover:text-rose-600"><Trash2 className="w-3 h-3"/></button>
+                                            </td>
+                                        )}
                                     </tr>
                                 )
                             })}
                         </tbody>
                         </table>
+                        {student.semesters?.length === 0 && <div className="p-4 text-center text-slate-400 text-xs">Belum ada data semester.</div>}
                     </div>
                 </div>
             ))}
+            
+            {/* ADD SEMESTER BUTTON FOR STUDENT */}
+            {isStudentLogin && isStudentGradeEditing && (
+                <div className="flex justify-center pt-4">
+                    <Button variant="secondary" onClick={() => addSemester(student.id)}>+ Tambah Semester Baru</Button>
+                </div>
+            )}
           </div>
         </Card>
       </div>
@@ -633,6 +735,7 @@ export default function Home() {
   };
 
   const renderAuth = () => (
+    // ... (Login form sama seperti sebelumnya)
     <div className="flex items-center justify-center min-h-[70vh] px-4">
       <Card className="w-full max-w-sm p-8 shadow-xl border-slate-200">
         <div className="text-center mb-6">
@@ -670,6 +773,7 @@ export default function Home() {
 
   // Simplified Dashboard Render
   const renderDashboard = () => (
+    // ... (Dashboard Admin tidak berubah secara fungsional)
     <div className="container mx-auto px-4 py-8">
       <div className="flex justify-between items-center mb-6">
         <h1 className="text-xl font-bold text-slate-900 flex items-center gap-2"><LayoutDashboard className="w-5 h-5 text-indigo-600" /> Admin Dashboard</h1>
@@ -750,8 +854,8 @@ export default function Home() {
                              <div key={sub.id} className="grid grid-cols-12 gap-1 items-center bg-slate-50 p-2 rounded text-xs">
                                 <div className="col-span-3"><input className="w-full bg-transparent font-bold text-slate-700" value={sub.name} onChange={(e) => handleSubjectChange(editingStudentId, selectedSemester, sIdx, 'name', e.target.value)} onBlur={(e) => saveSubjectBlur(sub.id, 'name', e.target.value)} /></div>
                                 <div className="col-span-1"><input className="w-full text-center bg-white rounded border border-slate-200" value={sub.sks} onChange={(e) => handleSubjectChange(editingStudentId, selectedSemester, sIdx, 'sks', e.target.value)} onBlur={(e) => saveSubjectBlur(sub.id, 'sks', e.target.value)} /></div>
-                                <div className="col-span-6 grid grid-cols-8 gap-0.5">
-                                   {['d1','d2','d3','d4','d5','t1','t2','uas'].map(k => (
+                                <div className="col-span-6 grid grid-cols-12 gap-0.5">
+                                   {['d1','d2','d3','d4','d5','d6','d7','d8','t1','t2','t3','uas'].map(k => (
                                      <input key={k} className={`w-full text-center rounded border border-slate-200 ${k==='uas'?'bg-amber-50 border-amber-200':''}`} placeholder={k} value={sub[k]||""} onChange={(e) => handleSubjectChange(editingStudentId, selectedSemester, sIdx, k, e.target.value)} onBlur={(e) => saveSubjectBlur(sub.id, k, e.target.value)} />
                                    ))}
                                 </div>
