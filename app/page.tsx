@@ -823,7 +823,7 @@ export default function StudentSystem() {
          <div className="container mx-auto px-4 h-16 flex items-center justify-between">
             <div className="flex items-center gap-3 cursor-pointer group" onClick={()=>setCurrentPage(user?.role==='Admin'?'admin':'report')}>
                 {/* Updated Logo */}
-                <img src="https://github.com/HafizWrG/Mahasantri2/blob/main/public/logo.png" alt="Logo Mahasantri" className="h-9 w-auto object-contain transition-transform group-hover:scale-105" />
+                <img src="https://blogger.googleusercontent.com/img/b/R29vZ2xl/AVvXsEhIcbbRuxJyICX-ZDIevk0t_g9O0pZ6C5lDE7PLyl0eVNblPELcU-f9zFfe6sTj0_Jzm4ygxzjP2XAyYTFzYvEUqu0VDjA6ssNfWCOSiBZWwvo8w5QEtdvGpfR5JsHfyoZhD6YqnDy1AGaUFXuzsBlhyphenhyphen88uXt02UhvTP1E9MVqmd98WMUwfS8C_omryc98/s320/logo.png" alt="Logo Mahasantri" className="h-9 w-auto object-contain transition-transform group-hover:scale-105" />
                 <span className="font-black text-xl tracking-tighter text-gray-900 hidden sm:block">MAHASANTRI_<span className="text-indigo-600">Site</span></span>
             </div>
             
